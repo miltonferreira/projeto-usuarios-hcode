@@ -14,5 +14,3 @@ class User {
     }
 
 }
-
-let ronaldo = ronaldo;
