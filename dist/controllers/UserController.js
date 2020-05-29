@@ -7,8 +7,9 @@ class UserController {
         this.formUpdateEl = document.getElementById(formIdUpdate);  //pega ID do formulario que edita um user
         this.tableEl = document.getElementById(tableId); //pega o ID da tabela que mostra os users
 
-        this.onSubmit();        //usado quando o usuario clicar para enviar formulario
-        this.onEdit();    //botao para cancelar edição do user
+        this.onSubmit();        // usado quando o usuario clicar para enviar formulario
+        this.onEdit();          // botao para cancelar edição do user
+        this.selectAll();       // mostra na sessão a página com lista de users
 
     }
 
@@ -42,34 +43,26 @@ class UserController {
                 (content) => {
 
                     if(!values.photo){
-                        result._photo = userOld._photo;         // usa a foto antiga, caso nao tenha escolhido outra
+                        result._photo = userOld._photo;     // usa a foto antiga, caso nao tenha escolhido outra
                     } else {
-                        result._photo = content;                // usa a foto nova, caso o user tenha escolhido outra
+                        result._photo = content;            // usa a foto nova, caso o user tenha escolhido outra
                     }
 
-                    tr.dataset.user = JSON.stringify(result);   // converte para JSON as infos para jogar no HTML
+                    let user = new User();
+
+                    user.loadFromJSON(result);
+
+                    user.save();                            // insere o user no sessionStorage
+
+                    this.getTr(user, tr);
                     
-                    tr.innerHTML = `
-                    <td><img src="${result._photo}" alt="User Image" class="img-circle img-sm"></td>
-                    <td>${result._name}</td>
-                    <td>${result._email}</td>
-                    <td>${(result._admin) ? 'Sim' : 'Não'}</td>
-                    <td>${Utils.dateFormat(result._register)}</td>
-                    <td>
-                        <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
-                        <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
-                    </td>
-                `;
-    
-                this.addEventsTr(tr);               // atualiza infos do user na tabela de user
-    
-                this.updateCount();                 // Atualiza numeros de users e admins
+                    this.updateCount();                     // Atualiza numeros de users e admins
 
-                    this.formUpdateEl.reset();      // limpa os campos do formulario
+                    this.formUpdateEl.reset();              // limpa os campos do formulario
 
-                    btn.disabled = false;           //ativa o botão quando enviar infos
+                    btn.disabled = false;                   //ativa o botão quando enviar infos
 
-                    this.showPanelCreate();         // mostra o formulario para criar novo user
+                    this.showPanelCreate();                 // mostra o formulario para criar novo user
                 }, 
                 (e) => {
                     console.error(e);
@@ -100,11 +93,13 @@ class UserController {
             this.getPhoto(this.formEl).then(
                 (content) => {
                     values.photo = content;
-                    this.addLine(values);       //adiciona na lista o novo usuario e infos
+                    this.addLine(values);       // adiciona na lista o novo usuario e infos
+
+                    values.save();              // insere o user no sessionStorage
 
                     this.formEl.reset();        // limpa o formulario
 
-                    btn.disabled = false;       //ativa o botão quando enviar infos
+                    btn.disabled = false;       // ativa o botão quando enviar infos
                 }, 
                 (e) => {
                     console.error(e);
@@ -205,13 +200,39 @@ class UserController {
         
     }
 
+    // mostra na sessão a página com lista de users
+    selectAll(){
+
+        let users = User.getUsersStorage();  //pega os users salvos na sessão da pagina
+
+        users.forEach(dataUser =>{
+
+            let user = new User();
+
+            user.loadFromJSON(dataUser);
+
+            this.addLine(user);
+        });
+
+    }
+
     // metodo para adiciona as infos do formulario na tela
     addLine(dataUser){
 
-        let tr = document.createElement('tr');
+        let tr = this.getTr(dataUser);
+        
+        this.tableEl.appendChild(tr);       //cria uma nova tr dentro da tabela
 
-        tr.dataset.user = JSON.stringify(dataUser); //converte em string Json o obj
+        this.updateCount();                 //Atualiza numeros de users e admins
     
+    }
+
+    getTr(dataUser, tr = null){
+
+        if(tr === null) tr = document.createElement('tr');  // se tr for nulo, cria um novo tr
+
+        tr.dataset.user = JSON.stringify(dataUser);         // converte para JSON as infos para jogar no HTML
+
         tr.innerHTML = `
             
                 <td><img src="${dataUser.photo}" alt="User Image" class="img-circle img-sm"></td>
@@ -221,21 +242,37 @@ class UserController {
                 <td>${Utils.dateFormat(dataUser.register)}</td>
                 <td>
                     <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
-                     <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
+                     <button type="button" class="btn btn-danger btn-delete btn-xs btn-flat">Excluir</button>
                 </td>
             
             `;
 
         this.addEventsTr(tr);
 
-        this.tableEl.appendChild(tr);
+        return tr;
 
-        this.updateCount();                 //Atualiza numeros de users e admins
-    
     }
 
     // Evento para incluir infos do user na lista de users
     addEventsTr(tr){
+
+        tr.querySelector(".btn-delete").addEventListener("click", e => {
+            
+            if(confirm("Deseja realmente excluir?")){
+
+                let user = new User();
+
+                user.loadFromJSON(JSON.parse(tr.dataset.user));
+
+                user.remove();          // remove o user do localStorage
+
+                tr.remove();            // deleta o user
+                this.updateCount();     // atualiza a quantidade de user na lista
+
+            }
+
+        });
+
         tr.querySelector(".btn-edit").addEventListener("click", e => {
 
             let json = JSON.parse(tr.dataset.user);
